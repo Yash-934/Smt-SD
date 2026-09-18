@@ -72,25 +72,33 @@ jobs:
           fi
 
           # Setup Signing Keystore
+          STORE_PWD="${{ secrets.STORE_PASSWORD }}"
+          KEY_PWD="${{ secrets.KEY_PASSWORD }}"
+          if [ -z "$STORE_PWD" ]; then STORE_PWD="android"; fi
+          if [ -z "$KEY_PWD" ]; then KEY_PWD="android"; fi
+
+          KEYSTORE_VALID=false
+
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "Decoding release keystore from secrets..."
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-upload-key.jks
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
-          elif [ -f debug.keystore.base64 ]; then
-            echo "Decoding fallback keystore..."
-            base64 -d debug.keystore.base64 > my-upload-key.jks
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
-          else
-            echo "Generating self-signed keystore for CI build..."
-            keytool -genkey -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=SchoolMarksPortal, OU=Development, O=AIStudio, L=Global, S=Global, C=US"
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+            if keytool -list -keystore my-upload-key.jks -alias upload -storepass "$STORE_PWD" > /dev/null 2>&1; then
+              echo "✓ Key with alias 'upload' verified."
+              KEYSTORE_VALID=true
+            else
+              echo "⚠️ Key alias 'upload' not found in provided secret keystore. Generating fresh release key with alias 'upload'..."
+            fi
           fi
+
+          if [ "$KEYSTORE_VALID" = false ]; then
+            echo "Generating valid release upload keystore with alias 'upload'..."
+            rm -f my-upload-key.jks
+            keytool -genkeypair -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass "$STORE_PWD" -keypass "$KEY_PWD" -dname "CN=SchoolMarksPortal, OU=Release, O=AIStudio, L=Global, ST=Global, C=US"
+          fi
+
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=$STORE_PWD" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=$KEY_PWD" >> $GITHUB_ENV
 
       - name: Build Android App (Release & Debug)
         run: |
