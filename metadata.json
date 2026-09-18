@@ -1,0 +1,7 @@
+{
+  "name": "Student Marks Portal",
+  "description": "Offline Student Examination & Master Result Portal for SMT SDEI Secondary School with report cards, marksheet generation, and mass marks entry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

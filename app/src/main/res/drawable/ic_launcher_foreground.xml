@@ -1,0 +1,33 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Academic Shield / Badge -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,23 L76,31 C76,53 66,71 54,77 C42,71 32,53 32,31 Z" />
+    <path
+        android:fillColor="#1E3A8A"
+        android:pathData="M54,26 L73,33 C73,51 64,68 54,73 C44,68 35,51 35,33 Z" />
+
+    <!-- Academic Mortarboard / Graduation Cap -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,34 L69,41 L54,48 L39,41 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M44,44.5 L44,52 C44,54 48,56 54,56 C60,56 64,54 64,52 L64,44.5 L54,49 Z" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M67,42 L67,54 L69,56 L69,43 Z" />
+
+    <!-- Checkmark & Marks Grade Stars -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,63 L52,67 L61,58 L63,60 L52,71 L46,65 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,79 L56.5,84 L62,84.5 L58,88 L59,93 L54,90.5 L49,93 L50,88 L46,84.5 L51.5,84 Z" />
+</vector>
+
