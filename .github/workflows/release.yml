@@ -1,0 +1,130 @@
+name: Build & Release Android App
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Target'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - 'release'
+          - 'debug'
+          - 'both'
+      create_github_release:
+        description: 'Create GitHub Release for tagged versions'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    name: Build APK & AAB
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare Environment & Secrets
+        run: |
+          # Ensure .env file exists for Secrets Gradle plugin
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
+          # Setup Signing Keystore
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding release keystore from secrets..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-upload-key.jks
+            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+          elif [ -f debug.keystore.base64 ]; then
+            echo "Decoding fallback keystore..."
+            base64 -d debug.keystore.base64 > my-upload-key.jks
+            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+          else
+            echo "Generating self-signed keystore for CI build..."
+            keytool -genkey -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=SchoolMarksPortal, OU=Development, O=AIStudio, L=Global, S=Global, C=US"
+            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+          fi
+
+      - name: Grant Execute Permission for Gradlew
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+          fi
+
+      - name: Build Android App (Release & Debug)
+        run: |
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+          
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            ./gradlew assembleDebug --stacktrace
+          elif [ "$BUILD_TYPE" = "both" ]; then
+            ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace
+          else
+            ./gradlew assembleRelease bundleRelease --stacktrace
+          fi
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p build-artifacts
+          
+          # Copy APKs
+          find app/build/outputs/apk/ -name "*.apk" -type f -exec cp {} build-artifacts/ \; 2>/dev/null || true
+          
+          # Copy AABs
+          find app/build/outputs/bundle/ -name "*.aab" -type f -exec cp {} build-artifacts/ \; 2>/dev/null || true
+          
+          echo "Generated Artifacts:"
+          ls -la build-artifacts/
+
+      - name: Upload APKs & AABs as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: school-marks-portal-binaries
+          path: build-artifacts/
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event.inputs.create_github_release == 'true' && github.event_name == 'workflow_dispatch')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build-artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          name: "School Marks Portal ${{ github.ref_name }}"
