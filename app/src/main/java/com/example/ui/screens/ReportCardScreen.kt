@@ -24,20 +24,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.SchoolConfig
 import com.example.data.model.StudentRecord
 import com.example.data.model.SubjectMarks
+import com.example.ui.components.FullScreenMarksheetDialog
 import com.example.ui.theme.AcademicTeal
 import com.example.ui.theme.SchoolNavy
 import com.example.ui.theme.SuccessGreen
@@ -68,6 +77,9 @@ fun ReportCardScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var showFullScreen by remember { mutableStateOf(false) }
+    var showEditRemarksDialog by remember { mutableStateOf(false) }
+    var tempRemarks by remember { mutableStateOf("") }
 
     if (student == null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -78,6 +90,59 @@ fun ReportCardScreen(
 
     val displayRemarks = customRemarks ?: student.computeSmartRemarks()
 
+    if (showFullScreen) {
+        FullScreenMarksheetDialog(
+            student = student,
+            schoolConfig = schoolConfig,
+            displayRemarks = displayRemarks,
+            onDismiss = { showFullScreen = false }
+        )
+    }
+
+    if (showEditRemarksDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditRemarksDialog = false },
+            title = {
+                Text(
+                    text = "Edit Student Remarks",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SchoolNavy
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Customize the teacher's remarks appearing on this student's marksheet:",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = tempRemarks,
+                        onValueChange = { tempRemarks = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. Excellent academic consistency and leadership.") },
+                        minLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onCustomRemarksChange(tempRemarks)
+                        showEditRemarksDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SchoolNavy)
+                ) {
+                    Text("Save Remarks")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showEditRemarksDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -86,7 +151,7 @@ fun ReportCardScreen(
         contentPadding = PaddingValues(top = 10.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Top Toolbar with Navigation & PDF Export / Print
+        // Top Toolbar with Navigation & PDF Export / Print / FullScreen
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -142,12 +207,27 @@ fun ReportCardScreen(
                         }
                     }
 
-                    // Action Buttons Row (Save PDF, Print, Share)
+                    // Action Buttons Row (Full Screen, Save PDF, Print, Share)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 1. Direct Save to Gallery / Downloads
+                        // 1. Full Screen Landscape View Button
+                        Button(
+                            onClick = { showFullScreen = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .testTag("btn_fullscreen_marksheet")
+                        ) {
+                            Icon(Icons.Default.Fullscreen, contentDescription = "Full Screen", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Full Screen", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        // 2. Direct Save to Gallery / Downloads
                         Button(
                             onClick = {
                                 try {
@@ -163,25 +243,25 @@ fun ReportCardScreen(
                                         customName = "Marksheet_Roll_${student.rollNo}_${student.name.replace(" ", "_")}.pdf"
                                     )
                                     if (!saved) {
-                                        Toast.makeText(context, "Export saved to app storage: ${pdfFile.name}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Export saved to: ${pdfFile.name}", Toast.LENGTH_SHORT).show()
                                     }
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Save error: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .weight(1.1f)
+                                .weight(1f)
                                 .testTag("btn_save_pdf_marksheet")
                         ) {
                             Icon(Icons.Default.Download, contentDescription = "Save PDF", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save PDF", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Save PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
 
-                        // 2. Print Button
+                        // 3. Print Button
                         Button(
                             onClick = {
                                 try {
@@ -201,18 +281,18 @@ fun ReportCardScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SchoolNavy),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(0.9f)
                                 .testTag("btn_print_marksheet")
                         ) {
                             Icon(Icons.Default.Print, contentDescription = "Print", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Print", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Print", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
 
-                        // 3. Share Button
+                        // 4. Share Button
                         OutlinedButton(
                             onClick = {
                                 try {
@@ -231,22 +311,22 @@ fun ReportCardScreen(
                                     Toast.makeText(context, "Share error: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(0.9f)
                                 .testTag("btn_share_marksheet")
                         ) {
                             Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(16.dp), tint = SchoolNavy)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Share", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = SchoolNavy)
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("Share", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = SchoolNavy)
                         }
                     }
                 }
             }
         }
 
-        // Exact Match Marksheet Container (Same as User's PDF Page 1)
+        // Exact Match Marksheet Container (Identical to WebApp layout)
         item {
             Card(
                 modifier = Modifier
@@ -268,7 +348,7 @@ fun ReportCardScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = schoolConfig.schoolName,
+                            text = schoolConfig.schoolName.uppercase(),
                             fontWeight = FontWeight.Bold,
                             fontSize = 19.sp,
                             color = Color(0xFF1E3A8A),
@@ -285,7 +365,7 @@ fun ReportCardScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "ANNUAL PROGRESS REPORT",
-                            color = Color(0xFF64748B),
+                            color = Color(0xFF1E293B),
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.5.sp,
                             letterSpacing = 1.sp
@@ -455,35 +535,41 @@ fun ReportCardScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Remarks Box
-                    Column(
+                    // Single Clean Remarks Box (Exact Match to WebApp - No Duplicate Remarks)
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color(0xFFF8FAFC), RoundedCornerShape(3.dp))
                             .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(3.dp))
-                            .padding(8.dp)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "📌 REMARKS: ",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.5.sp,
-                                color = Color(0xFF1E3A8A)
-                            )
-                            Text(
-                                text = displayRemarks,
-                                fontSize = 9.5.sp,
-                                color = Color(0xFF0F172A)
+                        Text(
+                            text = "📌 REMARKS: ",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.5.sp,
+                            color = Color(0xFF1E3A8A)
+                        )
+                        Text(
+                            text = displayRemarks,
+                            fontSize = 9.5.sp,
+                            color = Color(0xFF0F172A),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = {
+                                tempRemarks = displayRemarks
+                                showEditRemarksDialog = true
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit Remarks",
+                                modifier = Modifier.size(14.dp),
+                                tint = SchoolNavy
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = displayRemarks,
-                            onValueChange = onCustomRemarksChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            placeholder = { Text("Edit remarks if needed...", fontSize = 11.sp) }
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

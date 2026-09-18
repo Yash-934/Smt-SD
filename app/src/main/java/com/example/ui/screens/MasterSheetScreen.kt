@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -39,6 +40,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.SchoolConfig
 import com.example.data.model.StudentRecord
 import com.example.data.model.SubjectMarks
+import com.example.ui.components.FullScreenBroadsheetDialog
 import com.example.ui.theme.AcademicTeal
 import com.example.ui.theme.AccentGold
 import com.example.ui.theme.DangerRed
@@ -67,6 +73,15 @@ fun MasterSheetScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var showFullScreen by remember { mutableStateOf(false) }
+
+    if (showFullScreen) {
+        FullScreenBroadsheetDialog(
+            students = students,
+            schoolConfig = schoolConfig,
+            onDismiss = { showFullScreen = false }
+        )
+    }
 
     val totalStudents = students.size
     val passedCount = students.count { it.overallPercentage >= 33.0 }
@@ -110,11 +125,26 @@ fun MasterSheetScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Action Buttons Row (Save PDF, Print, Share, CSV)
+                // Action Buttons Row (Full Screen, Save PDF, Print, Share)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Full Screen View Button
+                    Button(
+                        onClick = { showFullScreen = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .testTag("btn_fullscreen_master_pdf")
+                    ) {
+                        Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("Full Screen", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
                     Button(
                         onClick = {
                             try {
@@ -136,14 +166,14 @@ fun MasterSheetScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
-                            .weight(1.1f)
+                            .weight(1f)
                             .testTag("btn_save_master_pdf")
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text("Save PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
@@ -165,14 +195,14 @@ fun MasterSheetScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = SchoolNavy),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(0.9f)
                             .testTag("btn_print_master_pdf")
                     ) {
                         Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text("Print", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
@@ -193,10 +223,10 @@ fun MasterSheetScreen(
                                 Toast.makeText(context, "PDF Share Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(0.9f)
                             .testTag("btn_share_master_pdf")
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp), tint = SchoolNavy)

@@ -70,7 +70,7 @@ object PdfExporter {
         schoolConfig: SchoolConfig,
         remarks: String
     ) {
-        val margin = 28f
+        val margin = 24f
         val right = PAGE_WIDTH - margin
         val bottom = PAGE_HEIGHT - margin
 
@@ -81,28 +81,36 @@ object PdfExporter {
         }
         canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), PAGE_HEIGHT.toFloat(), bgPaint)
 
-        // Outer Double Border Frame
+        // Outer Double Border Frame (Identical to WebApp)
         val borderPaint = Paint().apply {
             color = Color.parseColor("#1E3A8A")
             style = Paint.Style.STROKE
-            strokeWidth = 2.5f
+            strokeWidth = 2f
             isAntiAlias = true
         }
-        canvas.drawRoundRect(RectF(margin, margin, right, bottom), 4f, 4f, borderPaint)
+        canvas.drawRoundRect(RectF(margin, margin, right, bottom), 6f, 6f, borderPaint)
+
+        val innerBorderPaint = Paint().apply {
+            color = Color.parseColor("#1E3A8A")
+            style = Paint.Style.STROKE
+            strokeWidth = 0.5f
+            isAntiAlias = true
+        }
+        canvas.drawRoundRect(RectF(margin + 2.5f, margin + 2.5f, right - 2.5f, bottom - 2.5f), 5f, 5f, innerBorderPaint)
 
         // Header Section
-        var currentY = margin + 26f
+        var currentY = margin + 25f
 
         val titlePaint = Paint().apply {
             color = Color.parseColor("#1E3A8A")
-            textSize = 20f
+            textSize = 21f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
         }
-        canvas.drawText(schoolConfig.schoolName, PAGE_WIDTH / 2f, currentY, titlePaint)
+        canvas.drawText(schoolConfig.schoolName.uppercase(), PAGE_WIDTH / 2f, currentY, titlePaint)
 
-        currentY += 14f
+        currentY += 13f
         val subTitlePaint = Paint().apply {
             color = Color.parseColor("#475569")
             textSize = 9.5f
@@ -119,10 +127,11 @@ object PdfExporter {
         currentY += 14f
         val pillText = "ANNUAL PROGRESS REPORT"
         val pillPaint = Paint().apply {
-            color = Color.parseColor("#64748B")
-            textSize = 8.5f
+            color = Color.parseColor("#1E293B")
+            textSize = 9f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
+            letterSpacing = 0.05f
             isAntiAlias = true
         }
         canvas.drawText(pillText, PAGE_WIDTH / 2f, currentY, pillPaint)
@@ -130,55 +139,54 @@ object PdfExporter {
         currentY += 10f
 
         // Student Meta Section Box
+        val tableLeft = margin + 6f
+        val tableRight = right - 6f
+        val tableWidth = tableRight - tableLeft
+
         val metaBoxTop = currentY
-        val metaBoxHeight = 36f
+        val metaBoxHeight = 34f
         val metaBoxBottom = metaBoxTop + metaBoxHeight
 
         val metaBoxPaint = Paint().apply {
-            color = Color.parseColor("#000000")
+            color = Color.BLACK
             style = Paint.Style.STROKE
             strokeWidth = 0.8f
         }
-        canvas.drawRect(margin + 8f, metaBoxTop, right - 8f, metaBoxBottom, metaBoxPaint)
+        canvas.drawRect(tableLeft, metaBoxTop, tableRight, metaBoxBottom, metaBoxPaint)
 
-        val metaTextPaint = Paint().apply {
-            color = Color.parseColor("#0F172A")
-            textSize = 10f
+        val metaLabelPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 9.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             isAntiAlias = true
         }
         val metaValPaint = Paint().apply {
-            color = Color.parseColor("#0F172A")
-            textSize = 10f
+            color = Color.BLACK
+            textSize = 9.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             isAntiAlias = true
         }
 
-        val leftColX = margin + 14f
-        val midColX = PAGE_WIDTH / 2f + 40f
+        val leftColX = tableLeft + 8f
+        val midColX = PAGE_WIDTH / 2f + 45f
 
-        canvas.drawText("Student Name:", leftColX, metaBoxTop + 14f, metaTextPaint)
-        canvas.drawText(student.name.ifEmpty { "N/A" }, leftColX + 80f, metaBoxTop + 14f, metaValPaint)
+        canvas.drawText("Student Name:", leftColX, metaBoxTop + 14f, metaLabelPaint)
+        canvas.drawText(student.name.ifEmpty { "N/A" }, leftColX + 78f, metaBoxTop + 14f, metaValPaint)
 
-        canvas.drawText("Roll No:", midColX, metaBoxTop + 14f, metaTextPaint)
+        canvas.drawText("Roll No:", midColX, metaBoxTop + 14f, metaLabelPaint)
         canvas.drawText("${student.rollNo}", midColX + 50f, metaBoxTop + 14f, metaValPaint)
 
-        canvas.drawText("Class & Section:", leftColX, metaBoxTop + 28f, metaTextPaint)
-        canvas.drawText(schoolConfig.classSec, leftColX + 80f, metaBoxTop + 28f, metaValPaint)
+        canvas.drawText("Class & Section:", leftColX, metaBoxTop + 27f, metaLabelPaint)
+        canvas.drawText(schoolConfig.classSec, leftColX + 78f, metaBoxTop + 27f, metaValPaint)
 
-        canvas.drawText("Scholar / SR No:", midColX, metaBoxTop + 28f, metaTextPaint)
-        canvas.drawText(student.sr.ifEmpty { "N/A" }, midColX + 80f, metaBoxTop + 28f, metaValPaint)
+        canvas.drawText("Scholar / SR No:", midColX, metaBoxTop + 27f, metaLabelPaint)
+        canvas.drawText(student.sr.ifEmpty { "N/A" }, midColX + 85f, metaBoxTop + 27f, metaValPaint)
 
-        currentY = metaBoxBottom + 8f
+        currentY = metaBoxBottom + 7f
 
-        // Evaluation Table
-        val tableLeft = margin + 8f
-        val tableRight = right - 8f
-        val tableWidth = tableRight - tableLeft
-
-        // Column widths definition
-        // Columns: SN(30), Subject(130), UT1(38), UT2(38), UT MM(42), UT Ob(46), HY MM(46), HY Ob(46), Ann MM(46), Ann Ob(46), Grand MM(50), Grand Ob(52), Perc(60)
-        val colWidths = floatArrayOf(28f, 130f, 38f, 38f, 42f, 44f, 44f, 46f, 44f, 46f, 48f, 50f, 58f)
+        // Evaluation Table - Column widths spanning exactly 782pt
+        // SN(28), Subject(134), UT1(42), UT2(42), UT-MM(48), UT-Ob(52), HY-MM(50), HY-Ob(54), Ann-MM(50), Ann-Ob(54), Grand-MM(58), Grand-Ob(64), Perc(66)
+        val colWidths = floatArrayOf(28f, 134f, 42f, 42f, 48f, 52f, 50f, 54f, 50f, 54f, 58f, 64f, 66f)
         val colStarts = FloatArray(colWidths.size + 1)
         colStarts[0] = tableLeft
         for (i in colWidths.indices) {
@@ -186,14 +194,14 @@ object PdfExporter {
         }
 
         val tableHeaderH = 26f
-        val rowH = 17.5f
+        val rowH = 17f
 
-        // Table Header 1
-        val th1BgPaint = Paint().apply {
+        // Table Header Background
+        val thBgPaint = Paint().apply {
             color = Color.parseColor("#F1F5F9")
             style = Paint.Style.FILL
         }
-        canvas.drawRect(tableLeft, currentY, tableRight, currentY + tableHeaderH, th1BgPaint)
+        canvas.drawRect(tableLeft, currentY, tableRight, currentY + tableHeaderH, thBgPaint)
 
         val gridLinePaint = Paint().apply {
             color = Color.BLACK
@@ -201,17 +209,17 @@ object PdfExporter {
             strokeWidth = 0.8f
         }
         // Outer table rectangle
-        val totalTableRows = 10 + 1 // 10 subjects + 1 total
+        val totalTableRows = 10 + 1 // 10 subjects + 1 total row
         val tableBottom = currentY + tableHeaderH + (totalTableRows * rowH)
         canvas.drawRect(tableLeft, currentY, tableRight, tableBottom, gridLinePaint)
 
-        // Draw header vertical & horizontal lines
+        // Draw header horizontal split lines
         val thMidY = currentY + (tableHeaderH / 2f)
         canvas.drawLine(tableLeft, thMidY, tableRight, thMidY, gridLinePaint)
         canvas.drawLine(tableLeft, currentY + tableHeaderH, tableRight, currentY + tableHeaderH, gridLinePaint)
 
         val headerTextPaint = Paint().apply {
-            color = Color.parseColor("#0F172A")
+            color = Color.BLACK
             textSize = 8.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
@@ -348,8 +356,8 @@ object PdfExporter {
 
         currentY = tableBottom + 10f
 
-        // Remarks Box
-        val remarksBoxH = 28f
+        // Single Clean Remarks Box (Exact Match to WebApp - No Duplicate Remarks)
+        val remarksBoxH = 26f
         val remarksBg = Paint().apply {
             color = Color.parseColor("#F8FAFC")
             style = Paint.Style.FILL
@@ -364,19 +372,19 @@ object PdfExporter {
 
         val remTextPaint = Paint().apply {
             color = Color.parseColor("#1E3A8A")
-            textSize = 9f
+            textSize = 8.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             isAntiAlias = true
         }
         val remValPaint = Paint().apply {
             color = Color.parseColor("#0F172A")
-            textSize = 8.8f
+            textSize = 8.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             isAntiAlias = true
         }
 
-        canvas.drawText("📌 REMARKS:", tableLeft + 8f, currentY + 17f, remTextPaint)
-        canvas.drawText(remarks, tableLeft + 78f, currentY + 17f, remValPaint)
+        canvas.drawText("📌 REMARKS:", tableLeft + 8f, currentY + 16f, remTextPaint)
+        canvas.drawText(remarks, tableLeft + 76f, currentY + 16f, remValPaint)
 
         currentY += remarksBoxH + 34f
 
@@ -449,7 +457,7 @@ object PdfExporter {
         pageNumber: Int,
         totalPages: Int
     ) {
-        val margin = 20f
+        val margin = 16f
         val right = PAGE_WIDTH - margin
         val bottom = PAGE_HEIGHT - margin
 
@@ -469,7 +477,7 @@ object PdfExporter {
         canvas.drawRect(margin, margin, right, bottom, borderPaint)
 
         // Title Header
-        var currentY = margin + 18f
+        var currentY = margin + 17f
         val titlePaint = Paint().apply {
             color = Color.BLACK
             textSize = 12f
@@ -486,26 +494,25 @@ object PdfExporter {
 
         currentY += 8f
 
-        // Table definition
-        val tableLeft = margin + 4f
-        val tableRight = right - 4f
+        // Table definition - Spanning all 810pt width from tableLeft(16f) to tableRight(826f)
+        val tableLeft = margin
+        val tableRight = right
         val gridLinePaint = Paint().apply {
             color = Color.BLACK
             style = Paint.Style.STROKE
             strokeWidth = 0.6f
         }
 
-        // Columns:
-        // RollNo (28), Name (80), ExamTerm (44), SR No (44),
-        // 10 Subjects * 48 each (480 total for subjects),
-        // Grand Total (54), Result (48)
-        val colRoll = 24f
-        val colName = 74f
-        val colExam = 38f
-        val colSr = 38f
-        val colSub = 48.5f // 10 subjects * 48.5 = 485f
-        val colGrand = 56f
-        val colResult = 49f
+        // Exact Column widths summing to 810pt:
+        // Roll No (26), Name (92), Exam (42), SR No (42),
+        // 10 Subjects * 51 = 510, Grand Total (50), Result (48)
+        val colRoll = 26f
+        val colName = 92f
+        val colExam = 42f
+        val colSr = 42f
+        val colSub = 51f // 10 * 51 = 510f (each sub-column = 12.75f)
+        val colGrand = 50f
+        val colResult = 48f
 
         val colStarts = FloatArray(16)
         colStarts[0] = tableLeft
@@ -527,12 +534,12 @@ object PdfExporter {
             color = Color.parseColor("#E2E8F0")
             style = Paint.Style.FILL
         }
-        canvas.drawRect(tableLeft, currentY, colStarts[15], currentY + thH, thBgPaint)
-        canvas.drawRect(tableLeft, currentY, colStarts[15], currentY + thH, gridLinePaint)
+        canvas.drawRect(tableLeft, currentY, tableRight, currentY + thH, thBgPaint)
+        canvas.drawRect(tableLeft, currentY, tableRight, currentY + thH, gridLinePaint)
 
         val headerTextPaint = Paint().apply {
             color = Color.BLACK
-            textSize = 6.8f
+            textSize = 7.2f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
@@ -572,24 +579,24 @@ object PdfExporter {
 
         // Student Data Rows
         var rowTop = currentY + thH
-        val subRowH = 10f
+        val subRowH = 11.5f
         val studentH = subRowH * 4f // 4 sub-rows per student
 
         val cellPaint = Paint().apply {
             color = Color.BLACK
-            textSize = 6.2f
+            textSize = 6.8f
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
         }
         val namePaint = Paint().apply {
             color = Color.BLACK
-            textSize = 6.2f
+            textSize = 6.8f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.LEFT
             isAntiAlias = true
         }
         val shadedPaint = Paint().apply {
-            color = Color.parseColor("#F1F5F9")
+            color = Color.parseColor("#F8FAFC")
             style = Paint.Style.FILL
         }
 
@@ -599,19 +606,19 @@ object PdfExporter {
 
             // Alternating student subtle shading
             if (sIdx % 2 == 1) {
-                canvas.drawRect(tableLeft, sTop, colStarts[15], sBottom, shadedPaint)
+                canvas.drawRect(tableLeft, sTop, tableRight, sBottom, shadedPaint)
             }
 
             // Student meta info (spans all 4 sub-rows)
-            canvas.drawText("${student.rollNo}", (colStarts[0] + colStarts[1]) / 2f, sTop + studentH / 2f + 2f, cellPaint)
-            canvas.drawText(student.name.take(12), colStarts[1] + 2f, sTop + studentH / 2f + 2f, namePaint)
-            canvas.drawText(student.exam.ifEmpty { "Term" }, (colStarts[2] + colStarts[3]) / 2f, sTop + studentH / 2f + 2f, cellPaint)
-            canvas.drawText(student.sr.ifEmpty { "-" }, (colStarts[3] + colStarts[4]) / 2f, sTop + studentH / 2f + 2f, cellPaint)
+            canvas.drawText("${student.rollNo}", (colStarts[0] + colStarts[1]) / 2f, sTop + studentH / 2f + 2.5f, cellPaint)
+            canvas.drawText(student.name.take(15), colStarts[1] + 3f, sTop + studentH / 2f + 2.5f, namePaint)
+            canvas.drawText(student.exam.ifEmpty { "Term" }, (colStarts[2] + colStarts[3]) / 2f, sTop + studentH / 2f + 2.5f, cellPaint)
+            canvas.drawText(student.sr.ifEmpty { "-" }, (colStarts[3] + colStarts[4]) / 2f, sTop + studentH / 2f + 2.5f, cellPaint)
 
             // 4 sub-rows: R1, R2, R3, TOTAL
             for (subRow in 0..3) {
                 val lineY = sTop + (subRow * subRowH)
-                val baseline = lineY + 7.5f
+                val baseline = lineY + 8f
 
                 if (subRow < 3) {
                     // UT / HY / Annual
@@ -644,7 +651,7 @@ object PdfExporter {
 
                         val boldSubPaint = Paint().apply {
                             color = Color.BLACK
-                            textSize = 6.5f
+                            textSize = 7f
                             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                             textAlign = Paint.Align.CENTER
                             isAntiAlias = true
@@ -661,7 +668,7 @@ object PdfExporter {
             }
 
             // Draw student box borders
-            canvas.drawRect(tableLeft, sTop, colStarts[15], sBottom, gridLinePaint)
+            canvas.drawRect(tableLeft, sTop, tableRight, sBottom, gridLinePaint)
             for (i in 1..14) {
                 canvas.drawLine(colStarts[i], sTop, colStarts[i], sBottom, gridLinePaint)
             }
