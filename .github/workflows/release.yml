@@ -47,6 +47,18 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Ensure Gradle Wrapper
+        run: |
+          if [ ! -f gradlew ]; then
+            echo "Generating Gradle wrapper..."
+            gradle wrapper --gradle-version 8.11.1 || true
+          fi
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+          fi
 
       - name: Prepare Environment & Secrets
         run: |
@@ -80,22 +92,23 @@ jobs:
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
           fi
 
-      - name: Grant Execute Permission for Gradlew
-        run: |
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-          fi
-
       - name: Build Android App (Release & Debug)
         run: |
+          if [ -f ./gradlew ]; then
+            GRADLE_CMD="./gradlew"
+          else
+            GRADLE_CMD="gradle"
+          fi
+          echo "Using build command: $GRADLE_CMD"
+
           BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
           
           if [ "$BUILD_TYPE" = "debug" ]; then
-            ./gradlew assembleDebug --stacktrace
+            $GRADLE_CMD assembleDebug --stacktrace
           elif [ "$BUILD_TYPE" = "both" ]; then
-            ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace
+            $GRADLE_CMD assembleDebug assembleRelease bundleRelease --stacktrace
           else
-            ./gradlew assembleRelease bundleRelease --stacktrace
+            $GRADLE_CMD assembleRelease bundleRelease --stacktrace
           fi
 
       - name: Prepare Artifacts
