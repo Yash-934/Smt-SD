@@ -1,12 +1,15 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -34,10 +38,17 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -99,31 +110,41 @@ fun MarksEntryScreen(
                         OutlinedButton(
                             onClick = onPrevStudent,
                             enabled = currentIndex > 0,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("btn_prev_student")
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .height(36.dp)
+                                .testTag("btn_prev_student")
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Previous",
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Back", fontSize = 12.sp)
+                            Text("Back", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = SchoolNavy
+                            shape = RoundedCornerShape(18.dp),
+                            color = SchoolNavy,
+                            modifier = Modifier.height(36.dp)
                         ) {
-                            Text(
-                                text = "Roll: ${currentIndex + 1} / $totalStudents",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Roll: ${currentIndex + 1} / $totalStudents",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
@@ -131,15 +152,18 @@ fun MarksEntryScreen(
                         OutlinedButton(
                             onClick = onNextStudent,
                             enabled = currentIndex < totalStudents - 1,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("btn_next_student")
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .height(36.dp)
+                                .testTag("btn_next_student")
                         ) {
-                            Text("Next", fontSize = 12.sp)
+                            Text("Next", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "Next",
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
                     }
@@ -242,17 +266,24 @@ fun MarksEntryScreen(
                 Button(
                     onClick = onOpenReportCard,
                     colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("btn_quick_view_marksheet")
+                    modifier = Modifier
+                        .height(36.dp)
+                        .testTag("btn_quick_view_marksheet")
                 ) {
                     Icon(
                         Icons.Default.Assessment,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Result Marksheet", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        "Marksheet",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -481,7 +512,7 @@ private fun TierInputRow(
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 11.5.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(60.dp)
@@ -515,18 +546,25 @@ private fun TierInputRow(
         )
 
         Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.width(42.dp)
+            shape = RoundedCornerShape(6.dp),
+            color = Color(0xFFF1F5F9),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            modifier = Modifier
+                .width(42.dp)
+                .height(38.dp)
         ) {
-            Text(
-                text = calculatedSum,
-                textAlign = TextAlign.Center,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(vertical = 5.dp)
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = calculatedSum,
+                    textAlign = TextAlign.Center,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+            }
         }
     }
 }
@@ -538,7 +576,9 @@ fun MiniScoreField(
     placeholder: String,
     modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
+    var isFocused by remember { mutableStateOf(false) }
+
+    BasicTextField(
         value = value,
         onValueChange = { input ->
             // Allow numbers up to 3 digits or decimal
@@ -546,18 +586,51 @@ fun MiniScoreField(
                 onValueChange(input)
             }
         },
-        placeholder = { Text(placeholder, fontSize = 11.sp, textAlign = TextAlign.Center) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = modifier.height(44.dp),
-        textStyle = MaterialTheme.typography.bodySmall.copy(
-            textAlign = TextAlign.Center,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
+        textStyle = TextStyle(
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0F172A),
+            textAlign = TextAlign.Center
         ),
-        shape = RoundedCornerShape(6.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
-        )
+        cursorBrush = SolidColor(SchoolNavy),
+        modifier = modifier
+            .height(38.dp)
+            .onFocusChanged { isFocused = it.isFocused },
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(
+                        width = if (isFocused) 1.5.dp else 1.dp,
+                        color = if (isFocused) SchoolNavy else Color(0xFFCBD5E1),
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                    .background(
+                        color = if (isFocused) Color(0xFFF8FAFC) else Color.White,
+                        shape = RoundedCornerShape(6.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF94A3B8),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    innerTextField()
+                }
+            }
+        }
     )
 }

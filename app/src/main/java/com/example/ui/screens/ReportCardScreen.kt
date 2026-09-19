@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -166,40 +167,49 @@ fun ReportCardScreen(
                         OutlinedButton(
                             onClick = onPrevStudent,
                             enabled = currentIndex > 0,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(36.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous", modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous", modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Prev", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = SchoolNavy
+                            shape = RoundedCornerShape(18.dp),
+                            color = SchoolNavy,
+                            modifier = Modifier.height(36.dp)
                         ) {
-                            Text(
-                                text = "Roll ${currentIndex + 1} of $totalStudents",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Roll ${currentIndex + 1} of $totalStudents",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp
+                                )
+                            }
                         }
 
                         OutlinedButton(
                             onClick = onNextStudent,
                             enabled = currentIndex < totalStudents - 1,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(36.dp)
                         ) {
                             Text("Next", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next", modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next", modifier = Modifier.size(15.dp))
                         }
                     }
 
-                    // Action Buttons Row (Full Screen, Save PDF, Print, Share)
+                    // Action Buttons Row (Full Screen, Save PDF, Print, Share) - Perfectly Equal Dimensions & No Overflow
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -208,15 +218,16 @@ fun ReportCardScreen(
                         Button(
                             onClick = onOpenFullScreen,
                             colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .weight(1.1f)
+                                .weight(1f)
+                                .height(38.dp)
                                 .testTag("btn_fullscreen_marksheet")
                         ) {
-                            Icon(Icons.Default.Fullscreen, contentDescription = "Full Screen", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Fullscreen, contentDescription = "Full View", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(3.dp))
-                            Text("Full Screen", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Full View", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
 
                         // 2. Direct Save to Gallery / Downloads
@@ -242,15 +253,16 @@ fun ReportCardScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .weight(1f)
+                                .height(38.dp)
                                 .testTag("btn_save_pdf_marksheet")
                         ) {
-                            Icon(Icons.Default.Download, contentDescription = "Save PDF", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Download, contentDescription = "Save PDF", modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(3.dp))
-                            Text("Save PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Save PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
 
                         // 3. Print Button
@@ -273,15 +285,16 @@ fun ReportCardScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SchoolNavy),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .weight(0.9f)
+                                .weight(1f)
+                                .height(38.dp)
                                 .testTag("btn_print_marksheet")
                         ) {
-                            Icon(Icons.Default.Print, contentDescription = "Print", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Print, contentDescription = "Print", modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(3.dp))
-                            Text("Print", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Print", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
 
                         // 4. Share Button
@@ -303,15 +316,16 @@ fun ReportCardScreen(
                                     Toast.makeText(context, "Share error: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .weight(0.9f)
+                                .weight(1f)
+                                .height(38.dp)
                                 .testTag("btn_share_marksheet")
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(16.dp), tint = SchoolNavy)
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text("Share", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = SchoolNavy)
+                            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(15.dp), tint = SchoolNavy)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Share", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SchoolNavy, maxLines = 1)
                         }
                     }
                 }

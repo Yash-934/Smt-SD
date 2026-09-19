@@ -118,126 +118,142 @@ fun MasterSheetScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Action Buttons Row (Full Screen, Save PDF, Print, Share)
-                Row(
+                // Action Buttons - Clean 2-Tier Row Layout (Zero Overflow, Consistent Sizing)
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Full Screen View Button
-                    Button(
-                        onClick = onOpenFullScreen,
-                        colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(1.1f)
-                            .testTag("btn_fullscreen_master_pdf")
+                    // Row 1: Primary Broad Actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("Full Screen", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
+                        Button(
+                            onClick = onOpenFullScreen,
+                            colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .testTag("btn_fullscreen_master_pdf")
+                        ) {
+                            Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Full Screen View", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
 
-                    Button(
-                        onClick = {
-                            try {
-                                val file = PdfExporter.generateMasterBroadsheetPdf(
-                                    context = context,
-                                    students = students,
-                                    schoolConfig = schoolConfig
-                                )
-                                val saved = PdfExporter.savePdfToPublicDownloads(
-                                    context = context,
-                                    file = file,
-                                    customName = "Master_Broadsheet_Session_${schoolConfig.session.replace("/", "-")}.pdf"
-                                )
-                                if (!saved) {
-                                    Toast.makeText(context, "Saved to cache: ${file.name}", Toast.LENGTH_SHORT).show()
+                        Button(
+                            onClick = {
+                                try {
+                                    val file = PdfExporter.generateMasterBroadsheetPdf(
+                                        context = context,
+                                        students = students,
+                                        schoolConfig = schoolConfig
+                                    )
+                                    val saved = PdfExporter.savePdfToPublicDownloads(
+                                        context = context,
+                                        file = file,
+                                        customName = "Master_Broadsheet_Session_${schoolConfig.session.replace("/", "-")}.pdf"
+                                    )
+                                    if (!saved) {
+                                        Toast.makeText(context, "Saved to cache: ${file.name}", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "PDF Save Error: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "PDF Save Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("btn_save_master_pdf")
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("Save PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .testTag("btn_save_master_pdf")
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Save Broadsheet PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
                     }
 
-                    Button(
-                        onClick = {
-                            try {
-                                val file = PdfExporter.generateMasterBroadsheetPdf(
-                                    context = context,
-                                    students = students,
-                                    schoolConfig = schoolConfig
-                                )
-                                PdfExporter.printPdf(
-                                    context = context,
-                                    file = file,
-                                    jobTitle = "Master Broadsheet - Session ${schoolConfig.session}"
-                                )
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Print Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SchoolNavy),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(0.9f)
-                            .testTag("btn_print_master_pdf")
+                    // Row 2: Secondary Utility Actions (Print, Share, CSV)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("Print", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
+                        Button(
+                            onClick = {
+                                try {
+                                    val file = PdfExporter.generateMasterBroadsheetPdf(
+                                        context = context,
+                                        students = students,
+                                        schoolConfig = schoolConfig
+                                    )
+                                    PdfExporter.printPdf(
+                                        context = context,
+                                        file = file,
+                                        jobTitle = "Master Broadsheet - Session ${schoolConfig.session}"
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Print Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SchoolNavy),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("btn_print_master_pdf")
+                        ) {
+                            Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Print", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
 
-                    OutlinedButton(
-                        onClick = {
-                            try {
-                                val file = PdfExporter.generateMasterBroadsheetPdf(
-                                    context = context,
-                                    students = students,
-                                    schoolConfig = schoolConfig
-                                )
-                                PdfExporter.openOrSharePdf(
-                                    context = context,
-                                    file = file,
-                                    title = "Master Broadsheet - Session ${schoolConfig.session}"
-                                )
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "PDF Share Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(0.9f)
-                            .testTag("btn_share_master_pdf")
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp), tint = SchoolNavy)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Share", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = SchoolNavy)
-                    }
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val file = PdfExporter.generateMasterBroadsheetPdf(
+                                        context = context,
+                                        students = students,
+                                        schoolConfig = schoolConfig
+                                    )
+                                    PdfExporter.openOrSharePdf(
+                                        context = context,
+                                        file = file,
+                                        title = "Master Broadsheet - Session ${schoolConfig.session}"
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "PDF Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("btn_share_master_pdf")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp), tint = SchoolNavy)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Share", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = SchoolNavy, maxLines = 1)
+                        }
 
-                    OutlinedButton(
-                        onClick = { exportCsv(context, students, schoolConfig) },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(0.9f)
-                            .testTag("btn_export_csv")
-                    ) {
-                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("CSV", fontSize = 11.sp)
+                        OutlinedButton(
+                            onClick = { exportCsv(context, students, schoolConfig) },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("btn_export_csv")
+                        ) {
+                            Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(15.dp), tint = SchoolNavy)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("CSV", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = SchoolNavy, maxLines = 1)
+                        }
                     }
                 }
 

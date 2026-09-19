@@ -121,21 +121,25 @@ fun StudentListScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
                                     text = schoolConfig.schoolName,
                                     style = MaterialTheme.typography.titleMedium,
                                     color = Color.White,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "Class: ${schoolConfig.classSec} • Session: ${schoolConfig.session}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.85f)
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 color = Color.White.copy(alpha = 0.2f)
                             ) {
                                 Text(
@@ -143,7 +147,8 @@ fun StudentListScreen(
                                     color = Color.White,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }
                         }
@@ -152,22 +157,25 @@ fun StudentListScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             StatMiniBox(
                                 label = "Class Avg",
                                 value = String.format("%.1f%%", classStats.second),
-                                color = Color(0xFFFDE047)
+                                color = Color(0xFFFDE047),
+                                modifier = Modifier.weight(1f)
                             )
                             StatMiniBox(
                                 label = "Top Score",
                                 value = classStats.third?.let { "${it.grandTotal.toInt()}/2000" } ?: "0/2000",
-                                color = Color(0xFF86EFAC)
+                                color = Color(0xFF86EFAC),
+                                modifier = Modifier.weight(1f)
                             )
                             StatMiniBox(
                                 label = "Top Ranker",
-                                value = classStats.third?.name?.take(12) ?: "N/A",
-                                color = Color.White
+                                value = classStats.third?.name ?: "N/A",
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
@@ -315,18 +323,25 @@ fun StudentListScreen(
 }
 
 @Composable
-private fun StatMiniBox(label: String, value: String, color: Color) {
+private fun StatMiniBox(
+    label: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.75f)
+            color = Color.White.copy(alpha = 0.75f),
+            maxLines = 1
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.titleSmall,
