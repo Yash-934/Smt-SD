@@ -25,7 +25,9 @@ enum class AppScreen {
     MARKS_ENTRY,
     MASS_ENTRY,
     REPORT_CARD,
-    MASTER_SHEET
+    MASTER_SHEET,
+    FULLSCREEN_MARKSHEET,
+    FULLSCREEN_BROADSHEET
 }
 
 class StudentViewModel(application: Application) : AndroidViewModel(application) {

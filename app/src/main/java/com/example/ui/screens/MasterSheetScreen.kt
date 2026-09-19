@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,18 +71,10 @@ fun MasterSheetScreen(
     schoolConfig: SchoolConfig,
     onSelectStudent: (index: Int) -> Unit,
     onOpenMarksEntry: (index: Int) -> Unit,
+    onOpenFullScreen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var showFullScreen by remember { mutableStateOf(false) }
-
-    if (showFullScreen) {
-        FullScreenBroadsheetDialog(
-            students = students,
-            schoolConfig = schoolConfig,
-            onDismiss = { showFullScreen = false }
-        )
-    }
 
     val totalStudents = students.size
     val passedCount = students.count { it.overallPercentage >= 33.0 }
@@ -132,7 +125,7 @@ fun MasterSheetScreen(
                 ) {
                     // Full Screen View Button
                     Button(
-                        onClick = { showFullScreen = true },
+                        onClick = onOpenFullScreen,
                         colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp),
                         shape = RoundedCornerShape(6.dp),
@@ -411,8 +404,11 @@ private fun BroadsheetStudentRow(
                         BDataCell(text = "${eval.total.toInt()}", width = 36.dp, bold = true)
                         rowTotalSum += eval.total
                     } else {
-                        // Grand Total of Subject
-                        BDataCell(text = "${subMarks.grandTotal.toInt()}", width = 120.dp, bold = true, textColor = SchoolNavy)
+                        // Grand Total of Subject aligned under TOTAL column (columns 1, 2, 3 empty)
+                        BDataCell(text = "", width = 28.dp)
+                        BDataCell(text = "", width = 28.dp)
+                        BDataCell(text = "", width = 28.dp)
+                        BDataCell(text = "${subMarks.grandTotal.toInt()}", width = 36.dp, bold = true, textColor = SchoolNavy)
                     }
                 }
 

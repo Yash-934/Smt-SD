@@ -45,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,10 +75,10 @@ fun ReportCardScreen(
     onPrevStudent: () -> Unit,
     onNextStudent: () -> Unit,
     onCustomRemarksChange: (String) -> Unit,
+    onOpenFullScreen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var showFullScreen by remember { mutableStateOf(false) }
     var showEditRemarksDialog by remember { mutableStateOf(false) }
     var tempRemarks by remember { mutableStateOf("") }
 
@@ -89,15 +90,6 @@ fun ReportCardScreen(
     }
 
     val displayRemarks = customRemarks ?: student.computeSmartRemarks()
-
-    if (showFullScreen) {
-        FullScreenMarksheetDialog(
-            student = student,
-            schoolConfig = schoolConfig,
-            displayRemarks = displayRemarks,
-            onDismiss = { showFullScreen = false }
-        )
-    }
 
     if (showEditRemarksDialog) {
         AlertDialog(
@@ -214,7 +206,7 @@ fun ReportCardScreen(
                     ) {
                         // 1. Full Screen Landscape View Button
                         Button(
-                            onClick = { showFullScreen = true },
+                            onClick = onOpenFullScreen,
                             colors = ButtonDefaults.buttonColors(containerColor = AcademicTeal),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(8.dp),

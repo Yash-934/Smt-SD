@@ -213,9 +213,9 @@ object PdfExporter {
         val tableBottom = currentY + tableHeaderH + (totalTableRows * rowH)
         canvas.drawRect(tableLeft, currentY, tableRight, tableBottom, gridLinePaint)
 
-        // Draw header horizontal split lines
+        // Draw header horizontal split lines (only across subjects/totals, not slicing through SN, Subject, Percentage)
         val thMidY = currentY + (tableHeaderH / 2f)
-        canvas.drawLine(tableLeft, thMidY, tableRight, thMidY, gridLinePaint)
+        canvas.drawLine(colStarts[2], thMidY, colStarts[12], thMidY, gridLinePaint)
         canvas.drawLine(tableLeft, currentY + tableHeaderH, tableRight, currentY + tableHeaderH, gridLinePaint)
 
         val headerTextPaint = Paint().apply {
@@ -514,7 +514,7 @@ object PdfExporter {
         val colGrand = 50f
         val colResult = 48f
 
-        val colStarts = FloatArray(16)
+        val colStarts = FloatArray(17)
         colStarts[0] = tableLeft
         colStarts[1] = colStarts[0] + colRoll
         colStarts[2] = colStarts[1] + colName
@@ -523,8 +523,8 @@ object PdfExporter {
         for (s in 0 until 10) {
             colStarts[5 + s] = colStarts[4 + s] + colSub
         }
-        colStarts[14] = colStarts[13] + colGrand
-        colStarts[15] = colStarts[14] + colResult
+        colStarts[15] = colStarts[14] + colGrand
+        colStarts[16] = colStarts[15] + colResult
 
         val thH = 22f
         val thMidY = currentY + (thH / 2f)
@@ -570,10 +570,10 @@ object PdfExporter {
             canvas.drawLine(subLeft + subColW * 3, thMidY, subLeft + subColW * 3, currentY + thH, gridLinePaint)
         }
 
-        canvas.drawText("GRAND TOT", (colStarts[13] + colStarts[14]) / 2f, currentY + 14f, headerTextPaint)
-        canvas.drawText("RESULT", (colStarts[14] + colStarts[15]) / 2f, currentY + 14f, headerTextPaint)
+        canvas.drawText("GRAND TOT", (colStarts[14] + colStarts[15]) / 2f, currentY + 14f, headerTextPaint)
+        canvas.drawText("RESULT", (colStarts[15] + colStarts[16]) / 2f, currentY + 14f, headerTextPaint)
 
-        for (i in 1..14) {
+        for (i in 1..15) {
             canvas.drawLine(colStarts[i], currentY, colStarts[i], currentY + thH, gridLinePaint)
         }
 
@@ -640,14 +640,14 @@ object PdfExporter {
                         canvas.drawText("${eval.total.toInt()}", subLeft + subColW * 3.5f, baseline, cellPaint)
                         rowSum += eval.total
                     }
-                    canvas.drawText("${rowSum.toInt()}", (colStarts[13] + colStarts[14]) / 2f, baseline, cellPaint)
+                    canvas.drawText("${rowSum.toInt()}", (colStarts[14] + colStarts[15]) / 2f, baseline, cellPaint)
                 } else {
                     // Total Sub-row
                     for (subIdx in 0 until 10) {
                         val subName = StudentRecord.ALL_SUBJECTS[subIdx]
                         val subMarks = student.marks[subName] ?: SubjectMarks(subjectName = subName)
                         val subLeft = colStarts[4 + subIdx]
-                        val subRight = colStarts[5 + subIdx]
+                        val subColW = colSub / 4f
 
                         val boldSubPaint = Paint().apply {
                             color = Color.BLACK
@@ -656,29 +656,30 @@ object PdfExporter {
                             textAlign = Paint.Align.CENTER
                             isAntiAlias = true
                         }
-                        canvas.drawText("${subMarks.grandTotal.toInt()}", (subLeft + subRight) / 2f, baseline, boldSubPaint)
+                        // Draw subject grand total under TOT (4th column)
+                        canvas.drawText("${subMarks.grandTotal.toInt()}", subLeft + subColW * 3.5f, baseline, boldSubPaint)
                     }
-                    canvas.drawText("${student.grandTotal.toInt()}", (colStarts[13] + colStarts[14]) / 2f, baseline, headerTextPaint)
-                    canvas.drawText(String.format("%.2f%%", student.overallPercentage), (colStarts[14] + colStarts[15]) / 2f, baseline, headerTextPaint)
+                    canvas.drawText("${student.grandTotal.toInt()}", (colStarts[14] + colStarts[15]) / 2f, baseline, headerTextPaint)
+                    canvas.drawText(String.format("%.2f%%", student.overallPercentage), (colStarts[15] + colStarts[16]) / 2f, baseline, headerTextPaint)
                 }
 
                 if (subRow < 3) {
-                    canvas.drawLine(colStarts[4], lineY + subRowH, colStarts[14], lineY + subRowH, gridLinePaint)
+                    canvas.drawLine(colStarts[4], lineY + subRowH, colStarts[15], lineY + subRowH, gridLinePaint)
                 }
             }
 
             // Draw student box borders
             canvas.drawRect(tableLeft, sTop, tableRight, sBottom, gridLinePaint)
-            for (i in 1..14) {
+            for (i in 1..15) {
                 canvas.drawLine(colStarts[i], sTop, colStarts[i], sBottom, gridLinePaint)
             }
 
-            // Draw inner sub-column lines for subjects for sub-rows 0, 1, 2
+            // Draw inner sub-column lines for subjects for all 4 sub-rows
             for (subIdx in 0 until 10) {
                 val subLeft = colStarts[4 + subIdx]
                 val subColW = colSub / 4f
                 for (c in 1..3) {
-                    canvas.drawLine(subLeft + subColW * c, sTop, subLeft + subColW * c, sTop + subRowH * 3f, gridLinePaint)
+                    canvas.drawLine(subLeft + subColW * c, sTop, subLeft + subColW * c, sBottom, gridLinePaint)
                 }
             }
 

@@ -61,6 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AddStudentDialog
 import com.example.ui.components.BackupRestoreDialog
 import com.example.ui.components.ConfirmClearDialog
+import com.example.ui.components.FullScreenBroadsheetScreen
+import com.example.ui.components.FullScreenMarksheetScreen
 import com.example.ui.components.SettingsDialog
 import com.example.ui.screens.MarksEntryScreen
 import com.example.ui.screens.MassSubjectEntryScreen
@@ -117,12 +119,15 @@ fun MainAppPortal(viewModel: StudentViewModel) {
         }
     }
 
+    val isFullScreen = currentScreen == AppScreen.FULLSCREEN_MARKSHEET || currentScreen == AppScreen.FULLSCREEN_BROADSHEET
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
+            if (!isFullScreen) {
+                TopAppBar(
+                    title = {
                     Column {
                         Text(
                             text = schoolConfig.schoolName,
@@ -215,8 +220,10 @@ fun MainAppPortal(viewModel: StudentViewModel) {
                     }
                 }
             )
-        },
-        bottomBar = {
+        }
+    },
+    bottomBar = {
+        if (!isFullScreen) {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp
@@ -287,12 +294,13 @@ fun MainAppPortal(viewModel: StudentViewModel) {
                 )
             }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+    }
+) { innerPadding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(if (isFullScreen) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
+    ) {
             when (currentScreen) {
                 AppScreen.ROSTER -> {
                     StudentListScreen(
@@ -346,7 +354,8 @@ fun MainAppPortal(viewModel: StudentViewModel) {
                         customRemarks = customRemarks,
                         onPrevStudent = { viewModel.prevStudent() },
                         onNextStudent = { viewModel.nextStudent() },
-                        onCustomRemarksChange = { viewModel.setCustomRemarks(it) }
+                        onCustomRemarksChange = { viewModel.setCustomRemarks(it) },
+                        onOpenFullScreen = { viewModel.setScreen(AppScreen.FULLSCREEN_MARKSHEET) }
                     )
                 }
                 AppScreen.MASTER_SHEET -> {
@@ -357,7 +366,23 @@ fun MainAppPortal(viewModel: StudentViewModel) {
                         onOpenMarksEntry = {
                             viewModel.selectStudentByIndex(it)
                             viewModel.setScreen(AppScreen.MARKS_ENTRY)
-                        }
+                        },
+                        onOpenFullScreen = { viewModel.setScreen(AppScreen.FULLSCREEN_BROADSHEET) }
+                    )
+                }
+                AppScreen.FULLSCREEN_MARKSHEET -> {
+                    FullScreenMarksheetScreen(
+                        student = currentStudent,
+                        schoolConfig = schoolConfig,
+                        displayRemarks = customRemarks ?: currentStudent?.computeSmartRemarks().orEmpty(),
+                        onBack = { viewModel.setScreen(AppScreen.REPORT_CARD) }
+                    )
+                }
+                AppScreen.FULLSCREEN_BROADSHEET -> {
+                    FullScreenBroadsheetScreen(
+                        students = students,
+                        schoolConfig = schoolConfig,
+                        onBack = { viewModel.setScreen(AppScreen.MASTER_SHEET) }
                     )
                 }
             }

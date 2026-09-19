@@ -1,12 +1,28 @@
 package com.example.ui.components
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
+import android.graphics.drawable.ColorDrawable
+import android.view.View
+import android.view.ViewGroup
+import android.view.Window
+import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,14 +37,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
@@ -42,17 +64,23 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.example.data.model.SchoolConfig
 import com.example.data.model.StudentRecord
 import com.example.data.model.SubjectMarks
@@ -68,17 +97,58 @@ import com.example.ui.theme.SuccessGreen
 import com.example.util.PdfExporter
 
 /**
+ * Helper to get Activity from Context for orientation control
+ */
+tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/**
+ * Helper to locate the Dialog Window up the view tree to configure MATCH_PARENT dimensions
+ */
+tailrec fun findDialogWindow(view: View?): Window? {
+    if (view == null) return null
+    if (view is DialogWindowProvider) return view.window
+    val parent = view.parent
+    if (parent is DialogWindowProvider) return parent.window
+    return if (parent is View) findDialogWindow(parent) else null
+}
+
+/**
  * Fullscreen Landscape Dialog for Single Student Marksheet.
  * Provides interactive zoom, pan, full-screen canvas, and quick export actions.
  */
 @Composable
-fun FullScreenMarksheetDialog(
-    student: StudentRecord,
+fun FullScreenMarksheetScreen(
+    student: StudentRecord?,
     schoolConfig: SchoolConfig,
     displayRemarks: String,
-    onDismiss: () -> Unit
+    onBack: () -> Unit
 ) {
+    if (student == null) {
+        onBack()
+        return
+    }
+
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+
+    // Force landscape orientation while this screen is active
+    DisposableEffect(activity) {
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+
+    // Gesture back & system back navigation support
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
@@ -87,171 +157,364 @@ fun FullScreenMarksheetDialog(
         offset += offsetChange
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    val vScrollState = rememberScrollState()
+    val hScrollState = rememberScrollState()
+
+    var isToolbarVisible by rememberSaveable { mutableStateOf(true) }
+    var isPinned by rememberSaveable { mutableStateOf(false) }
+
+    // Auto-hide Top Bar after 3.5 seconds of inactivity unless pinned
+    LaunchedEffect(isToolbarVisible, isPinned) {
+        if (isToolbarVisible && !isPinned) {
+            delay(3500)
+            isToolbarVisible = false
+        }
+    }
+
+    // Auto-hide immediately on scroll or zoom gesture if unpinned
+    LaunchedEffect(vScrollState.isScrollInProgress, hScrollState.isScrollInProgress, transformState.isTransformInProgress) {
+        if (!isPinned && (vScrollState.isScrollInProgress || hScrollState.isScrollInProgress || transformState.isTransformInProgress)) {
+            if (isToolbarVisible) {
+                isToolbarVisible = false
+            }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFF0F172A)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color(0xFF0F172A)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Top Action Toolbar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(SchoolNavy)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.size(36.dp)
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Animated Collapsible / Hideable Top Action Toolbar
+                    AnimatedVisibility(
+                        visible = isToolbarVisible,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SchoolNavy)
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close Fullscreen",
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column {
-                            Text(
-                                text = "Full Screen Marksheet",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "${student.name} • Roll ${student.rollNo} • Class ${schoolConfig.classSec}",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = onBack,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Close Fullscreen",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column {
+                                    Text(
+                                        text = "Full Screen Marksheet",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        text = "${student.name} • Roll ${student.rollNo} • Class ${schoolConfig.classSec}",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Zoom Out
+                                IconButton(
+                                    onClick = { scale = (scale - 0.2f).coerceAtLeast(0.7f) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(17.dp))
+                                }
+                                // Reset / 100%
+                                IconButton(
+                                    onClick = { scale = 1f; offset = Offset.Zero },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.FullscreenExit, contentDescription = "Reset Zoom", tint = Color.White, modifier = Modifier.size(17.dp))
+                                }
+                                // Zoom In
+                                IconButton(
+                                    onClick = { scale = (scale + 0.2f).coerceAtMost(3.0f) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(17.dp))
+                                }
+
+                                // Save PDF
+                                Button(
+                                    onClick = {
+                                        try {
+                                            val pdfFile = PdfExporter.generateSingleMarksheetPdf(
+                                                context = context,
+                                                student = student,
+                                                schoolConfig = schoolConfig,
+                                                remarks = displayRemarks
+                                            )
+                                            PdfExporter.savePdfToPublicDownloads(
+                                                context = context,
+                                                file = pdfFile,
+                                                customName = "Marksheet_Roll_${student.rollNo}_${student.name.replace(" ", "_")}.pdf"
+                                            )
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                // Print
+                                OutlinedButton(
+                                    onClick = {
+                                        try {
+                                            val pdfFile = PdfExporter.generateSingleMarksheetPdf(
+                                                context = context,
+                                                student = student,
+                                                schoolConfig = schoolConfig,
+                                                remarks = displayRemarks
+                                            )
+                                            PdfExporter.printPdf(context, pdfFile, "Marksheet - ${student.name}")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Print Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Print", fontSize = 11.sp, color = Color.White)
+                                }
+
+                                // Pin / Auto-Hide toggle
+                                Surface(
+                                    onClick = { isPinned = !isPinned },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isPinned) Color(0xFF2563EB) else Color.White.copy(alpha = 0.18f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            if (isPinned) Icons.Default.Lock else Icons.Default.LockOpen,
+                                            contentDescription = if (isPinned) "Pinned" else "Auto-Hide (3s)",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = if (isPinned) "Pinned" else "Auto-Hide (3s)",
+                                            fontSize = 10.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                // Hide Toolbar (Full Immersive View)
+                                IconButton(
+                                    onClick = { isToolbarVisible = false },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.VisibilityOff,
+                                        contentDescription = "Hide Toolbar",
+                                        tint = Color(0xFF93C5FD),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Interactive Content Area with 2D Scroll + Zoom/Pan
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                            .background(Color(0xFF1E293B))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                isToolbarVisible = !isToolbarVisible
+                            }
+                            .verticalScroll(vScrollState)
+                            .horizontalScroll(hScrollState)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Zoom Out
-                        IconButton(
-                            onClick = { scale = (scale - 0.2f).coerceAtLeast(0.7f) },
-                            modifier = Modifier.size(32.dp)
+                        Box(
+                            modifier = Modifier
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offset.x,
+                                    translationY = offset.y
+                                )
+                                .transformable(transformState)
                         ) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
-                        // Zoom In
-                        IconButton(
-                            onClick = { scale = (scale + 0.2f).coerceAtMost(3.0f) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
-
-                        // Save PDF
-                        Button(
-                            onClick = {
-                                try {
-                                    val pdfFile = PdfExporter.generateSingleMarksheetPdf(
-                                        context = context,
-                                        student = student,
-                                        schoolConfig = schoolConfig,
-                                        remarks = displayRemarks
-                                    )
-                                    PdfExporter.savePdfToPublicDownloads(
-                                        context = context,
-                                        file = pdfFile,
-                                        customName = "Marksheet_Roll_${student.rollNo}_${student.name.replace(" ", "_")}.pdf"
-                                    )
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        // Print
-                        OutlinedButton(
-                            onClick = {
-                                try {
-                                    val pdfFile = PdfExporter.generateSingleMarksheetPdf(
-                                        context = context,
-                                        student = student,
-                                        schoolConfig = schoolConfig,
-                                        remarks = displayRemarks
-                                    )
-                                    PdfExporter.printPdf(context, pdfFile, "Marksheet - ${student.name}")
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Print Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Print", fontSize = 11.sp, color = Color.White)
+                            MarksheetLandscapeCard(
+                                student = student,
+                                schoolConfig = schoolConfig,
+                                displayRemarks = displayRemarks
+                            )
                         }
                     }
                 }
 
-                // Interactive Content Area with 2D Scroll + Zoom/Pan
-                val vScrollState = rememberScrollState()
-                val hScrollState = rememberScrollState()
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF1E293B))
-                        .verticalScroll(vScrollState)
-                        .horizontalScroll(hScrollState)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
+                // Floating Controls Pill when Top Bar is Hidden
+                if (!isToolbarVisible) {
+                    Card(
                         modifier = Modifier
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offset.x,
-                                translationY = offset.y
-                            )
-                            .transformable(transformState)
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xDD0F172A)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
-                        MarksheetLandscapeCard(
-                            student = student,
-                            schoolConfig = schoolConfig,
-                            displayRemarks = displayRemarks
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Show Toolbar Button
+                            IconButton(
+                                onClick = { isToolbarVisible = true },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Visibility,
+                                    contentDescription = "Show Toolbar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            // Reset Zoom
+                            IconButton(
+                                onClick = { scale = 1f; offset = Offset.Zero },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.FullscreenExit,
+                                    contentDescription = "Reset Zoom",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            // Quick PDF
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val pdfFile = PdfExporter.generateSingleMarksheetPdf(
+                                            context = context,
+                                            student = student,
+                                            schoolConfig = schoolConfig,
+                                            remarks = displayRemarks
+                                        )
+                                        PdfExporter.savePdfToPublicDownloads(
+                                            context = context,
+                                            file = pdfFile,
+                                            customName = "Marksheet_Roll_${student.rollNo}_${student.name.replace(" ", "_")}.pdf"
+                                        )
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = "Download PDF",
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            // Close Button
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = Color(0xFFF87171),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+/**
+ * Backward compatibility wrapper
+ */
+@Composable
+fun FullScreenMarksheetDialog(
+    student: StudentRecord,
+    schoolConfig: SchoolConfig,
+    displayRemarks: String,
+    onDismiss: () -> Unit
+) {
+    FullScreenMarksheetScreen(
+        student = student,
+        schoolConfig = schoolConfig,
+        displayRemarks = displayRemarks,
+        onBack = onDismiss
+    )
 }
 
 /**
  * Fullscreen Landscape Dialog for Master Broadsheet (All Students).
  */
 @Composable
-fun FullScreenBroadsheetDialog(
+fun FullScreenBroadsheetScreen(
     students: List<StudentRecord>,
     schoolConfig: SchoolConfig,
-    onDismiss: () -> Unit
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+
+    // Force landscape orientation while this screen is active
+    DisposableEffect(activity) {
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+
+    // Gesture back & system back navigation support
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
@@ -260,152 +523,325 @@ fun FullScreenBroadsheetDialog(
         offset += offsetChange
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    val vScrollState = rememberScrollState()
+    val hScrollState = rememberScrollState()
+
+    var isToolbarVisible by rememberSaveable { mutableStateOf(true) }
+    var isPinned by rememberSaveable { mutableStateOf(false) }
+
+    // Auto-hide Top Bar after 3.5 seconds of inactivity unless pinned
+    LaunchedEffect(isToolbarVisible, isPinned) {
+        if (isToolbarVisible && !isPinned) {
+            delay(3500)
+            isToolbarVisible = false
+        }
+    }
+
+    // Auto-hide immediately on scroll or zoom gesture if unpinned
+    LaunchedEffect(vScrollState.isScrollInProgress, hScrollState.isScrollInProgress, transformState.isTransformInProgress) {
+        if (!isPinned && (vScrollState.isScrollInProgress || hScrollState.isScrollInProgress || transformState.isTransformInProgress)) {
+            if (isToolbarVisible) {
+                isToolbarVisible = false
+            }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFF0F172A)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color(0xFF0F172A)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top Action Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(SchoolNavy)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Animated Collapsible / Hideable Top Action Bar
+                AnimatedVisibility(
+                    visible = isToolbarVisible,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close Fullscreen",
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column {
-                            Text(
-                                text = "Full Screen Master Broadsheet",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "${students.size} Students • Session ${schoolConfig.session} (${schoolConfig.schoolName})",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp
-                            )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SchoolNavy)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Close Fullscreen",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Column {
+                                Text(
+                                    text = "Full Screen Master Broadsheet",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        text = "${students.size} Students • Session ${schoolConfig.session} (${schoolConfig.schoolName})",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { scale = (scale - 0.2f).coerceAtLeast(0.6f) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(17.dp))
+                                }
+                                IconButton(
+                                    onClick = { scale = 1f; offset = Offset.Zero },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.FullscreenExit, contentDescription = "Reset Zoom", tint = Color.White, modifier = Modifier.size(17.dp))
+                                }
+                                IconButton(
+                                    onClick = { scale = (scale + 0.2f).coerceAtMost(3.0f) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(17.dp))
+                                }
+
+                                Button(
+                                    onClick = {
+                                        try {
+                                            val pdfFile = PdfExporter.generateMasterBroadsheetPdf(
+                                                context = context,
+                                                students = students,
+                                                schoolConfig = schoolConfig
+                                            )
+                                            PdfExporter.savePdfToPublicDownloads(
+                                                context = context,
+                                                file = pdfFile,
+                                                customName = "Master_Broadsheet_Session_${schoolConfig.session.replace("/", "-")}.pdf"
+                                            )
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        try {
+                                            val pdfFile = PdfExporter.generateMasterBroadsheetPdf(
+                                                context = context,
+                                                students = students,
+                                                schoolConfig = schoolConfig
+                                            )
+                                            PdfExporter.printPdf(context, pdfFile, "Master Broadsheet")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Print Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Print", fontSize = 11.sp, color = Color.White)
+                                }
+
+                                // Pin / Auto-Hide toggle
+                                Surface(
+                                    onClick = { isPinned = !isPinned },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isPinned) Color(0xFF2563EB) else Color.White.copy(alpha = 0.18f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            if (isPinned) Icons.Default.Lock else Icons.Default.LockOpen,
+                                            contentDescription = if (isPinned) "Pinned" else "Auto-Hide (3s)",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = if (isPinned) "Pinned" else "Auto-Hide (3s)",
+                                            fontSize = 10.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                // Hide Toolbar (Full Immersive View)
+                                IconButton(
+                                    onClick = { isToolbarVisible = false },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.VisibilityOff,
+                                        contentDescription = "Hide Toolbar",
+                                        tint = Color(0xFF93C5FD),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Interactive 2D Scroll View
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                            .background(Color(0xFF1E293B))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                isToolbarVisible = !isToolbarVisible
+                            }
+                            .verticalScroll(vScrollState)
+                            .horizontalScroll(hScrollState)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.TopCenter
                     ) {
-                        IconButton(
-                            onClick = { scale = (scale - 0.2f).coerceAtLeast(0.6f) },
-                            modifier = Modifier.size(32.dp)
+                        Box(
+                            modifier = Modifier
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offset.x,
+                                    translationY = offset.y
+                                )
+                                .transformable(transformState)
                         ) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(
-                            onClick = { scale = (scale + 0.2f).coerceAtMost(3.0f) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
-
-                        Button(
-                            onClick = {
-                                try {
-                                    val pdfFile = PdfExporter.generateMasterBroadsheetPdf(
-                                        context = context,
-                                        students = students,
-                                        schoolConfig = schoolConfig
-                                    )
-                                    PdfExporter.savePdfToPublicDownloads(
-                                        context = context,
-                                        file = pdfFile,
-                                        customName = "Master_Broadsheet_Session_${schoolConfig.session.replace("/", "-")}.pdf"
-                                    )
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                try {
-                                    val pdfFile = PdfExporter.generateMasterBroadsheetPdf(
-                                        context = context,
-                                        students = students,
-                                        schoolConfig = schoolConfig
-                                    )
-                                    PdfExporter.printPdf(context, pdfFile, "Master Broadsheet")
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Print Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Print", fontSize = 11.sp, color = Color.White)
+                            MasterBroadsheetLandscapeCard(
+                                students = students,
+                                schoolConfig = schoolConfig
+                            )
                         }
                     }
                 }
 
-                // Interactive 2D Scroll View
-                val vScrollState = rememberScrollState()
-                val hScrollState = rememberScrollState()
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF1E293B))
-                        .verticalScroll(vScrollState)
-                        .horizontalScroll(hScrollState)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.TopCenter
-                ) {
-                    Box(
+                // Floating Controls Pill when Top Bar is Hidden
+                if (!isToolbarVisible) {
+                    Card(
                         modifier = Modifier
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offset.x,
-                                translationY = offset.y
-                            )
-                            .transformable(transformState)
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xDD0F172A)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
-                        MasterBroadsheetLandscapeCard(
-                            students = students,
-                            schoolConfig = schoolConfig
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Show Toolbar Button
+                            IconButton(
+                                onClick = { isToolbarVisible = true },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Visibility,
+                                    contentDescription = "Show Toolbar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            // Reset Zoom
+                            IconButton(
+                                onClick = { scale = 1f; offset = Offset.Zero },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.FullscreenExit,
+                                    contentDescription = "Reset Zoom",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            // Quick PDF
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val pdfFile = PdfExporter.generateMasterBroadsheetPdf(
+                                            context = context,
+                                            students = students,
+                                            schoolConfig = schoolConfig
+                                        )
+                                        PdfExporter.savePdfToPublicDownloads(
+                                            context = context,
+                                            file = pdfFile,
+                                            customName = "Master_Broadsheet_Session_${schoolConfig.session.replace("/", "-")}.pdf"
+                                        )
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = "Download PDF",
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            // Close Button
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = Color(0xFFF87171),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+/**
+ * Backward compatibility wrapper
+ */
+@Composable
+fun FullScreenBroadsheetDialog(
+    students: List<StudentRecord>,
+    schoolConfig: SchoolConfig,
+    onDismiss: () -> Unit
+) {
+    FullScreenBroadsheetScreen(
+        students = students,
+        schoolConfig = schoolConfig,
+        onBack = onDismiss
+    )
 }
 
 /**
@@ -652,7 +1088,7 @@ fun MasterBroadsheetLandscapeCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.width(840.dp),
+        modifier = modifier.width(960.dp),
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
@@ -667,10 +1103,12 @@ fun MasterBroadsheetLandscapeCard(
             Text(
                 text = "Examination Result For The Session ${schoolConfig.session} (${schoolConfig.schoolName})",
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 color = Color.Black,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
             )
 
             // Master Table
@@ -685,49 +1123,49 @@ fun MasterBroadsheetLandscapeCard(
                         .fillMaxWidth()
                         .background(Color(0xFFE2E8F0))
                         .border(0.8.dp, Color.Black)
-                        .height(36.dp),
+                        .height(38.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.width(26.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
-                        Text("Roll", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    Box(modifier = Modifier.width(32.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
+                        Text("Roll", fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
                     }
-                    Box(modifier = Modifier.width(92.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
-                        Text("NAME OF STUDENT", fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
+                    Box(modifier = Modifier.width(116.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
+                        Text("NAME OF STUDENT", fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
-                    Box(modifier = Modifier.width(42.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.width(46.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
                         Text("TERM", fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
-                    Box(modifier = Modifier.width(42.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.width(46.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
                         Text("SR NO.", fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    // 10 Subjects
+                    // 10 Subjects (each 60.dp -> four 15.dp sub-columns)
                     val subNamesShort = arrayOf("HINDI", "ENGLISH", "MATH", "SCIENCE", "SANSKRIT", "SOC SCI", "G.K.", "ART", "P.T.", "COMP")
                     subNamesShort.forEach { sName ->
                         Column(
                             modifier = Modifier
-                                .width(51.dp)
+                                .width(60.dp)
                                 .fillMaxHeight()
                                 .border(0.4.dp, Color.Black)
                         ) {
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                                Text(sName, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                                Text(sName, fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
                             }
                             Row(modifier = Modifier.fillMaxWidth().weight(1f).border(0.3.dp, Color.Black)) {
                                 listOf("I", "II", "III", "TOT").forEach { subCol ->
                                     Box(modifier = Modifier.weight(1f).fillMaxHeight().border(0.2.dp, Color.Black), contentAlignment = Alignment.Center) {
-                                        Text(subCol, fontSize = 6.5.sp, fontWeight = FontWeight.Bold)
+                                        Text(subCol, fontSize = 7.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
                     }
 
-                    Box(modifier = Modifier.width(50.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
-                        Text("GRAND\nTOT", fontSize = 7.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Box(modifier = Modifier.width(62.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
+                        Text("GRAND\nTOT", fontSize = 8.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     }
-                    Box(modifier = Modifier.width(48.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
-                        Text("RESULT", fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
+                    Box(modifier = Modifier.width(58.dp).fillMaxHeight().border(0.4.dp, Color.Black), contentAlignment = Alignment.Center) {
+                        Text("RESULT", fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -739,21 +1177,21 @@ fun MasterBroadsheetLandscapeCard(
                             .fillMaxWidth()
                             .background(bg)
                             .border(0.5.dp, Color.Black)
-                            .height(52.dp),
+                            .height(64.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Meta Info
-                        Box(modifier = Modifier.width(26.dp).fillMaxHeight().border(0.3.dp, Color.Black), contentAlignment = Alignment.Center) {
-                            Text("${student.rollNo}", fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                        Box(modifier = Modifier.width(32.dp).fillMaxHeight().border(0.3.dp, Color.Black), contentAlignment = Alignment.Center) {
+                            Text("${student.rollNo}", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
-                        Box(modifier = Modifier.width(92.dp).fillMaxHeight().border(0.3.dp, Color.Black).padding(horizontal = 3.dp), contentAlignment = Alignment.CenterStart) {
-                            Text(student.name, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                        Box(modifier = Modifier.width(116.dp).fillMaxHeight().border(0.3.dp, Color.Black).padding(horizontal = 4.dp), contentAlignment = Alignment.CenterStart) {
+                            Text(student.name, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, maxLines = 2)
                         }
-                        Box(modifier = Modifier.width(42.dp).fillMaxHeight().border(0.3.dp, Color.Black), contentAlignment = Alignment.Center) {
-                            Text(student.exam.ifEmpty { "Term" }, fontSize = 7.5.sp)
+                        Box(modifier = Modifier.width(46.dp).fillMaxHeight().border(0.3.dp, Color.Black), contentAlignment = Alignment.Center) {
+                            Text(student.exam.ifEmpty { "Term" }, fontSize = 8.sp)
                         }
-                        Box(modifier = Modifier.width(42.dp).fillMaxHeight().border(0.3.dp, Color.Black), contentAlignment = Alignment.Center) {
-                            Text(student.sr.ifEmpty { "-" }, fontSize = 7.5.sp)
+                        Box(modifier = Modifier.width(46.dp).fillMaxHeight().border(0.3.dp, Color.Black), contentAlignment = Alignment.Center) {
+                            Text(student.sr.ifEmpty { "-" }, fontSize = 8.sp)
                         }
 
                         // 10 Subject Data (4 sub-rows each)
@@ -761,7 +1199,7 @@ fun MasterBroadsheetLandscapeCard(
                             val subMarks = student.marks[subName] ?: SubjectMarks(subjectName = subName)
                             Column(
                                 modifier = Modifier
-                                    .width(51.dp)
+                                    .width(60.dp)
                                     .fillMaxHeight()
                                     .border(0.3.dp, Color.Black)
                             ) {
@@ -786,15 +1224,22 @@ fun MasterBroadsheetLandscapeCard(
                                     BroadsheetCell(subMarks.r3Annual.t3.ifEmpty { "-" })
                                     BroadsheetCell("${subMarks.r3Annual.total.toInt()}", bold = true)
                                 }
-                                // Row 4 (Grand Total)
-                                Box(
+                                // Row 4 (Grand Total of Subject - strictly aligned under TOT 4th column)
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f)
-                                        .background(Color(0xFFEEF2F6)),
-                                    contentAlignment = Alignment.Center
+                                        .background(Color(0xFFEEF2F6))
                                 ) {
-                                    Text("${subMarks.grandTotal.toInt()}", fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
+                                    BroadsheetCell("", backgroundColor = Color(0xFFEEF2F6))
+                                    BroadsheetCell("", backgroundColor = Color(0xFFEEF2F6))
+                                    BroadsheetCell("", backgroundColor = Color(0xFFEEF2F6))
+                                    BroadsheetCell(
+                                        text = "${subMarks.grandTotal.toInt()}",
+                                        bold = true,
+                                        textColor = SchoolNavy,
+                                        backgroundColor = Color(0xFFEEF2F6)
+                                    )
                                 }
                             }
                         }
@@ -802,38 +1247,48 @@ fun MasterBroadsheetLandscapeCard(
                         // Grand Totals Column (4 sub-rows)
                         Column(
                             modifier = Modifier
-                                .width(50.dp)
+                                .width(62.dp)
                                 .fillMaxHeight()
                                 .border(0.3.dp, Color.Black)
                         ) {
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                                Text("${student.totalUtObtained.toInt()}", fontSize = 7.sp)
+                                Text("${student.totalUtObtained.toInt()}", fontSize = 7.5.sp)
                             }
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                                Text("${student.totalHalfYearlyObtained.toInt()}", fontSize = 7.sp)
+                                Text("${student.totalHalfYearlyObtained.toInt()}", fontSize = 7.5.sp)
                             }
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                                Text("${student.totalAnnualObtained.toInt()}", fontSize = 7.sp)
+                                Text("${student.totalAnnualObtained.toInt()}", fontSize = 7.5.sp)
                             }
-                            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(Color(0xFFEEF2F6)), contentAlignment = Alignment.Center) {
-                                Text("${student.grandTotal.toInt()}", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(Color(0xFFE2E8F0)), contentAlignment = Alignment.Center) {
+                                Text("${student.grandTotal.toInt()}", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = SchoolNavy)
                             }
                         }
 
-                        // Result Column (Percentage)
-                        Box(
+                        // Result Column (Percentage in row 4)
+                        Column(
                             modifier = Modifier
-                                .width(48.dp)
+                                .width(58.dp)
                                 .fillMaxHeight()
-                                .border(0.3.dp, Color.Black),
-                            contentAlignment = Alignment.Center
+                                .border(0.3.dp, Color.Black)
                         ) {
-                            Text(
-                                String.format("%.2f%%", student.overallPercentage),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (student.overallPercentage >= 33.0) Color(0xFF15803D) else Color(0xFFDC2626)
-                            )
+                            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                Text("", fontSize = 7.sp)
+                            }
+                            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                Text("", fontSize = 7.sp)
+                            }
+                            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                Text("", fontSize = 7.sp)
+                            }
+                            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(Color(0xFFE2E8F0)), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format("%.2f%%", student.overallPercentage),
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (student.overallPercentage >= 33.0) Color(0xFF15803D) else Color(0xFFDC2626)
+                                )
+                            }
                         }
                     }
                 }
@@ -843,19 +1298,30 @@ fun MasterBroadsheetLandscapeCard(
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.BroadsheetCell(text: String, bold: Boolean = false) {
+private fun androidx.compose.foundation.layout.RowScope.BroadsheetCell(
+    text: String,
+    bold: Boolean = false,
+    textColor: Color = Color.Black,
+    backgroundColor: Color = Color.Transparent
+) {
     Box(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .border(0.15.dp, Color(0xFFCBD5E1)),
+            .background(backgroundColor)
+            .border(0.2.dp, Color(0xFFCBD5E1)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            fontSize = 6.5.sp,
+            fontSize = 7.5.sp,
+            lineHeight = 9.sp,
             fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-            color = Color.Black
+            color = textColor,
+            textAlign = TextAlign.Center,
+            style = androidx.compose.material3.LocalTextStyle.current.copy(
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+            )
         )
     }
 }
